@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: instapay
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+      - name: api-gateway
+        image: instapay-api-gateway
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SPRING_APPLICATION_NAME
+          value: "api-gateway"
+        - name: SPRING_PROFILES_ACTIVE
+          value: "native"
+        - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+          value: "http://discovery-service:8761/eureka/"
+        - name: SPRING_CLOUD_CONFIG_URI
+          value: "http://config-server:8888"
+        - name: SPRING_ZIPKIN_BASEURL
+          value: "http://zipkin:9411"
+        - name: SPRING_ZIPKIN_ENABLED
+          value: "true"
+        - name: SPRING_SLEUTH_SAMPLER_PROBABILITY
+          value: "1.0"
+        - name: MANAGEMENT_TRACING_SAMPLING_PROBABILITY
+          value: "1.0"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: instapay
+spec:
+  selector:
+    app: api-gateway
+  ports:
+  - port: 8080
+    targetPort: 8080
+    nodePort: 30000 
+  type: NodePort

@@ -1,0 +1,159 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:14
+    container_name: postgres
+    restart: always
+    environment:
+      POSTGRES_DB: instapay
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - instapay-network
+
+  discovery-service:
+    build:
+      context: ./discovery-service
+      dockerfile: Dockerfile
+    container_name: discovery-service
+    ports:
+      - "8761:8761"
+    networks:
+      - instapay-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  config-server:
+    build:
+      context: ./config-server
+      dockerfile: Dockerfile
+    container_name: config-server
+    ports:
+      - "8888:8888"
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+    networks:
+      - instapay-network
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      - discovery-service
+      - config-server
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+    networks:
+      - instapay-network
+
+  zipkin:
+    container_name: zipkin
+    image: openzipkin/zipkin
+    ports:
+      - "9411:9411"
+    networks:
+      - zipkin
+
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    container_name: user-service
+    ports:
+      - "8081:8081"
+    depends_on:
+      - discovery-service
+      - config-server
+      - postgres
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/instapay
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+    networks:
+      - instapay-network
+
+  transaction-service:
+    build:
+      context: ./transaction-service
+      dockerfile: Dockerfile
+    container_name: transaction-service
+    ports:
+      - "8082:8082"
+    depends_on:
+      - discovery-service
+      - config-server
+      - postgres
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/instapay
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+    networks:
+      - instapay-network
+
+  reporting-service:
+    build:
+      context: ./reporting-service
+      dockerfile: Dockerfile
+    container_name: reporting-service
+    ports:
+      - "8083:8083"
+    depends_on:
+      - discovery-service
+      - config-server
+      - postgres
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/instapay
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+    networks:
+      - instapay-network
+
+  frontend:
+    build:
+      context: ./frontend-angular
+      dockerfile: Dockerfile.dev
+    container_name: frontend
+    ports:
+      - "4200:4200"
+    volumes:
+      - ./frontend-angular:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - API_URL=http://api-gateway:8080
+    networks:
+      - instapay-network
+    stdin_open: true
+    tty: true
+    depends_on:
+      - api-gateway
+      - zipkin
+
+networks:
+  instapay-network:
+    driver: bridge
+  zipkin:
+    driver: bridge
+
+volumes:
+  pgdata:

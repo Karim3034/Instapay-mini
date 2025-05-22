@@ -1,0 +1,125 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  namespace: instapay
+data:
+  init-db.sql: |
+    -- Create databases
+    CREATE DATABASE instapay_user;
+    CREATE DATABASE instapay_transaction;
+    CREATE DATABASE instapay_reporting;
+
+    -- Connect to user database and create schema
+    \c instapay_user;
+
+
+    -- Connect to transaction database
+    \c instapay_transaction;
+
+    -- Create transaction_types enum if it doesn't exist
+    DO $$
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'transaction_type') THEN
+            CREATE TYPE transaction_type AS ENUM ('TRANSFER', 'DEPOSIT', 'WITHDRAWAL');
+        END IF;
+    END
+    $$;
+
+    -- Connect to reporting database
+    \c instapay_reporting;
+
+    -- Create report_types enum if it doesn't exist
+    DO $$
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'report_type') THEN
+            CREATE TYPE report_type AS ENUM ('DAILY', 'WEEKLY', 'MONTHLY', 'CUSTOM');
+        END IF;
+    END
+    $$;
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+  namespace: instapay
+type: Opaque
+data:
+  postgres-password: cG9zdGdyZXM=  
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: instapay
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: instapay
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: postgres-password
+        - name: POSTGRES_USER
+          value: postgres
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+        - name: init-db-script
+          mountPath: /docker-entrypoint-initdb.d
+        readinessProbe:
+          exec:
+            command: ["pg_isready", "-U", "postgres"]
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          exec:
+            command: ["pg_isready", "-U", "postgres"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: postgres-data
+        persistentVolumeClaim:
+          claimName: postgres-pvc
+      - name: init-db-script
+        configMap:
+          name: postgres-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: instapay
+spec:
+  selector:
+    app: postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+    nodePort: 30003
+  type: NodePort

@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: transaction-service
+  namespace: instapay
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: transaction-service
+  template:
+    metadata:
+      labels:
+        app: transaction-service
+    spec:
+      containers:
+      - name: transaction-service
+        image: instapay-transaction-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8082
+        env:
+        - name: SPRING_APPLICATION_NAME
+          value: transaction-service
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:postgresql://postgres:5432/instapay_transaction"
+        - name: SPRING_DATASOURCE_USERNAME
+          value: "postgres"
+        - name: SPRING_DATASOURCE_PASSWORD
+          value: "postgres"
+        - name: SPRING_CLOUD_CONFIG_URI
+          value: "http://config-server:8888"
+        - name: SPRING_ZIPKIN_BASEURL
+          value: "http://zipkin:9411"
+        - name: SPRING_ZIPKIN_ENABLED
+          value: "true"
+        - name: SPRING_SLEUTH_SAMPLER_PROBABILITY
+          value: "1.0"
+        - name: MANAGEMENT_TRACING_SAMPLING_PROBABILITY
+          value: "1.0"
+        - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+          value: update
+        - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+          value: http://discovery-service:8761/eureka/
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: transaction-service
+  namespace: instapay
+spec:
+  selector:
+    app: transaction-service
+  ports:
+  - port: 8082
+    targetPort: 8082
+    nodePort: 30005  
+  type: NodePort

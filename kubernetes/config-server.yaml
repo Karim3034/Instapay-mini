@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: config-server
+  namespace: instapay
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: config-server
+  template:
+    metadata:
+      labels:
+        app: config-server
+    spec:
+      containers:
+      - name: instapay-config-server
+        image: instapay-config-server:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8888
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "native"
+        - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+          value: "http://discovery-service:8761/eureka/"
+        - name: SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS
+          value: "classpath:/config/,classpath:/configurations/,file:/config-repo/"
+        volumeMounts:
+        - name: config-volume
+          mountPath: /config-repo
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8888
+          initialDelaySeconds: 120
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 10
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8888
+          initialDelaySeconds: 180
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: config-volume
+        configMap:
+          name: config-server-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: config-server
+  namespace: instapay
+spec:
+  selector:
+    app: config-server
+  ports:
+  - port: 8888
+    targetPort: 8888
+    nodePort: 30001
+  type: NodePort

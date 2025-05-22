@@ -1,0 +1,236 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:13-alpine
+    container_name: instapay-postgres-stage
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-staging_password}
+      POSTGRES_USER: ${DB_USER:-staging_user}
+      POSTGRES_DB: ${DB_NAME:-instapay_stage}
+      POSTGRES_MULTIPLE_DATABASES: instapay_user_stage,instapay_transaction_stage,instapay_reporting_stage
+      POSTGRES_INITDB_ARGS: --data-checksums
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data_stage:/var/lib/postgresql/data
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/postgres-init.sh
+    networks:
+      - instapay-network-stage
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    restart: unless-stopped
+
+  discovery-service:
+    build: ./discovery-service
+    container_name: instapay-discovery-stage
+    ports:
+      - "8762:8761"
+    environment:
+      SPRING_PROFILES_ACTIVE: stage
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+    networks:
+      - instapay-network-stage
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    restart: unless-stopped
+
+  config-server:
+    build: ./config-server
+    container_name: instapay-config-server-stage
+    environment:
+      SPRING_PROFILES_ACTIVE: stage,native
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+    ports:
+      - "8889:8888"
+    networks:
+      - instapay-network-stage
+    depends_on:
+      - discovery-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    restart: unless-stopped
+
+  user-service:
+    build: ./user-service
+    container_name: instapay-user-service-stage
+    environment:
+      SPRING_PROFILES_ACTIVE: stage
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/instapay_user_stage
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-staging_user}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-staging_password}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+    ports:
+      - "8084:8081"
+    networks:
+      - instapay-network-stage
+    depends_on:
+      - postgres
+      - discovery-service
+      - config-server
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    restart: unless-stopped
+
+  transaction-service:
+    build: ./transaction-service
+    container_name: instapay-transaction-service-stage
+    environment:
+      SPRING_PROFILES_ACTIVE: stage
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/instapay_transaction_stage
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-staging_user}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-staging_password}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+    ports:
+      - "8085:8082"
+    networks:
+      - instapay-network-stage
+    depends_on:
+      - postgres
+      - discovery-service
+      - config-server
+      - user-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    restart: unless-stopped
+
+  reporting-service:
+    build: ./reporting-service
+    container_name: instapay-reporting-service-stage
+    environment:
+      SPRING_PROFILES_ACTIVE: stage
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/instapay_reporting_stage
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-staging_user}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-staging_password}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+    ports:
+      - "8086:8083"
+    networks:
+      - instapay-network-stage
+    depends_on:
+      - postgres
+      - discovery-service
+      - config-server
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    restart: unless-stopped
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: instapay-api-gateway-stage
+    environment:
+      SPRING_PROFILES_ACTIVE: stage
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+    ports:
+      - "8087:8080"
+    networks:
+      - instapay-network-stage
+    depends_on:
+      - discovery-service
+      - config-server
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend-angular
+      args:
+        - NODE_ENV=stage
+    container_name: instapay-frontend-stage
+    environment:
+      - NODE_ENV=stage
+      - API_URL=http://localhost:8087
+    ports:
+      - "4201:80"
+    networks:
+      - instapay-network-stage
+    depends_on:
+      - api-gateway
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    restart: unless-stopped
+
+networks:
+  instapay-network-stage:
+    driver: bridge
+
+volumes:
+  postgres_data_stage:
+    name: instapay-postgres-data-stage

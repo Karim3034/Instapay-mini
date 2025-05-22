@@ -1,0 +1,154 @@
+services:
+  postgres:
+    image: postgres
+    container_name: instapay-postgres
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_MULTIPLE_DATABASES: instapay_user,instapay_transaction,instapay_reporting
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/postgres-init.sh
+    networks:
+      - instapay-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  discovery-service:
+    build: ./discovery-service
+    container_name: instapay-discovery
+    ports:
+      - "8761:8761"
+    networks:
+      - instapay-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  config-server:
+    build: ./config-server
+    container_name: instapay-config-server
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      SPRING_PROFILES_ACTIVE: native
+    ports:
+      - "8888:8888"
+    networks:
+      - instapay-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  user-service:
+    build: ./user-service
+    container_name: instapay-user-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-service:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/instapay_user
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+    ports:
+      - "8081:8081"
+    networks:
+      - instapay-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  transaction-service:
+    build: ./transaction-service
+    container_name: instapay-transaction-service
+    depends_on:
+     - postgres
+     - discovery-service
+     - user-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/instapay_transaction
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+    ports:
+      - "8082:8082"
+    networks:
+      - instapay-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  reporting-service:
+    build: ./reporting-service
+    container_name: instapay-reporting-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-service:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/instapay_reporting
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+    ports:
+      - "8083:8083"
+    networks:
+      - instapay-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: instapay-api-gateway
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+    ports:
+      - "8080:8080"
+    networks:
+      - instapay-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build: ./frontend-angular
+    container_name: instapay-frontend
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    ports:
+      - "4200:80"
+    networks:
+      - instapay-network
+
+networks:
+  instapay-network:
+    driver: bridge

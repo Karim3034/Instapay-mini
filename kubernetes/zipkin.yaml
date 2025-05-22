@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zipkin
+  namespace: instapay
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zipkin
+  template:
+    metadata:
+      labels:
+        app: zipkin
+    spec:
+      containers:
+      - name: zipkin
+        image: openzipkin/zipkin:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9411
+        env:
+        - name: STORAGE_TYPE
+          value: "mem"
+        - name: QUERY_PORT
+          value: "9411"
+        - name: JAVA_OPTS
+          value: "-Dserver.port=9411 -Dserver.address=0.0.0.0"
+        args: ["--STORAGE_TYPE=mem", "--server.port=9411", "--server.address=0.0.0.0"]
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "300m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zipkin
+  namespace: instapay
+spec:
+  selector:
+    app: zipkin
+  ports:
+  - port: 9411
+    targetPort: 9411
+    nodePort: 30007  
+  type: NodePort

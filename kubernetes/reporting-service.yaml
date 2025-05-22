@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reporting-service
+  namespace: instapay
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reporting-service
+  template:
+    metadata:
+      labels:
+        app: reporting-service
+    spec:
+      containers:
+      - name: instapay-reporting-service
+        image: instapay-reporting-service:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8083
+        env:
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:postgresql://postgres:5432/instapay_reporting"
+        - name: SPRING_DATASOURCE_USERNAME
+          value: "postgres"
+        - name: SPRING_DATASOURCE_PASSWORD
+          value: "postgres"
+        - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+          value: "http://discovery-service:8761/eureka/"
+        - name: SPRING_CLOUD_CONFIG_URI
+          value: "http://config-server:8888"
+        - name: SPRING_ZIPKIN_BASEURL
+          value: "http://zipkin:9411"
+        - name: SPRING_ZIPKIN_ENABLED
+          value: "true"
+        - name: MANAGEMENT_TRACING_SAMPLING_PROBABILITY
+          value: "1.0"   
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: reporting-service
+  namespace: instapay
+spec:
+  selector:
+    app: reporting-service
+  ports:
+  - port: 8083
+    targetPort: 8083
+    nodePort: 30004  
+  type: NodePort

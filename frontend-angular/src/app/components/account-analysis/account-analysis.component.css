@@ -1,0 +1,36 @@
+.card {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1rem;
+}
+
+.card-header {
+  font-weight: 500;
+}
+
+.summary-card {
+  transition: transform 0.3s;
+}
+
+.summary-card:hover {
+  transform: translateY(-5px);
+}
+
+.form-label {
+  font-weight: 500;
+}
+
+.btn-light {
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.btn-light:hover {
+  background-color: rgba(255, 255, 255, 0.9);
+}
+
+.table th {
+  font-weight: 600;
+}
+
+.badge {
+  font-size: 0.9rem;
+}

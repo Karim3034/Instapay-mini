@@ -1,0 +1,105 @@
+<div class="container" *ngIf="!loading && currentUser">
+  <div class="row mt-4">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Account Overview</h5>
+          <p class="card-text">Welcome, {{ currentUser.fullName }}!</p>
+          <p class="card-text">
+            <strong>Balance:</strong>
+            <span [ngClass]="{'text-success': currentUser.balance >= 0, 'text-danger': currentUser.balance < 0}">
+              ${{ currentUser.balance }}
+            </span>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Recent Transactions</h5>
+          <div *ngIf="recentTransactions.length === 0" class="text-center py-3">
+            <p>No recent transactions</p>
+          </div>
+          <div *ngIf="recentTransactions.length > 0">
+            <div class="list-group">
+              <div *ngFor="let transaction of recentTransactions" class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div>
+                    <h6 class="mb-1">{{ transaction.description }}</h6>
+                    <small>{{ transaction.timestamp | date:'medium' }}</small>
+                  </div>
+                  <span [ngClass]="{'text-success': transaction.amount > 0, 'text-danger': transaction.amount < 0}">
+                    {{ transaction.amount > 0 ? '+' : '' }}${{ transaction.amount }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row mt-4">
+    <div class="col-md-12">
+      <div class="card">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0">Quick Actions</h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-3 mb-3">
+              <div class="d-grid">
+                <button class="btn btn-outline-primary" routerLink="/send-money">Send Money</button>
+              </div>
+            </div>
+            <div class="col-md-3 mb-3">
+              <div class="d-grid">
+                <button class="btn btn-outline-primary" routerLink="/deposit">Deposit</button>
+              </div>
+            </div>
+            <div class="col-md-3 mb-3">
+              <div class="d-grid">
+                <button class="btn btn-outline-primary" routerLink="/withdraw">Withdraw</button>
+              </div>
+            </div>
+            <div class="col-md-3 mb-3">
+              <div class="d-grid">
+                <button class="btn btn-outline-primary" routerLink="/notifications">Notifications</button>
+              </div>
+            </div>
+          </div>
+          <div class="row mt-3">
+            <div class="col-md-6 mb-3">
+              <div class="d-grid">
+                <button class="btn btn-outline-info" routerLink="/profile">Account Details</button>
+              </div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <div class="d-grid">
+                <button class="btn btn-outline-info" routerLink="/account-analysis">Account Usage Analysis</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="container" *ngIf="loading">
+  <div class="text-center py-5">
+    <div class="spinner-border" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+  </div>
+</div>
+
+<div class="container" *ngIf="!loading && error">
+  <div class="alert alert-danger">
+    <p>{{ error }}</p>
+    <button class="btn btn-primary" (click)="loadUserData()">Retry</button>
+  </div>
+</div>

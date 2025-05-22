@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zipkin-config
+  namespace: instapay
+data:
+  application-zipkin.yml: |
+    spring:
+      zipkin:
+        baseUrl: http://zipkin:9411
+        enabled: true
+      sleuth:
+        sampler:
+          probability: 1.0

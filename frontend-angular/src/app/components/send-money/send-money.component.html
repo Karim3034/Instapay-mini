@@ -1,0 +1,80 @@
+<div class="container">
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+          <h4 class="mb-0">Send Money</h4>
+          <button class="btn btn-sm btn-light" routerLink="/dashboard">Back to Dashboard</button>
+        </div>
+        <div class="card-body">
+          <div class="alert alert-success" *ngIf="successMessage">
+            {{ successMessage }}
+          </div>
+          <div class="alert alert-danger" *ngIf="errorMessage">
+            {{ errorMessage }}
+          </div>
+
+          <form [formGroup]="sendMoneyForm" (ngSubmit)="onSubmit()">
+            <div class="mb-3">
+              <label for="receiverUsername" class="form-label">Recipient Username</label>
+              <input
+                type="text"
+                id="receiverUsername"
+                formControlName="receiverUsername"
+                class="form-control"
+                placeholder="Enter recipient's username"
+                [ngClass]="{ 'is-invalid': sendMoneyForm.get('receiverUsername')?.invalid && sendMoneyForm.get('receiverUsername')?.touched }"
+              >
+              <div class="invalid-feedback" *ngIf="sendMoneyForm.get('receiverUsername')?.errors?.['required'] && sendMoneyForm.get('receiverUsername')?.touched">
+                Please enter recipient's username
+              </div>
+              <div class="invalid-feedback" *ngIf="sendMoneyForm.get('receiverUsername')?.errors?.['minlength']">
+                Username must be at least 3 characters
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="amount" class="form-label">Amount</label>
+              <div class="input-group">
+                <span class="input-group-text">$</span>
+                <input
+                  type="number"
+                  id="amount"
+                  formControlName="amount"
+                  class="form-control"
+                  [ngClass]="{ 'is-invalid': sendMoneyForm.get('amount')?.invalid && sendMoneyForm.get('amount')?.touched }"
+                  step="0.01"
+                  min="0.01"
+                />
+                <div class="invalid-feedback" *ngIf="sendMoneyForm.get('amount')?.errors?.['required'] && sendMoneyForm.get('amount')?.touched">
+                  Amount is required
+                </div>
+                <div class="invalid-feedback" *ngIf="sendMoneyForm.get('amount')?.errors?.['min'] && sendMoneyForm.get('amount')?.touched">
+                  Amount must be greater than 0
+                </div>
+              </div>
+              <small class="text-muted" *ngIf="userProfile">Available balance: ${{ userProfile.balance?.toFixed(2) || '0.00' }}</small>
+            </div>
+
+            <div class="mb-3">
+              <label for="description" class="form-label">Description (Optional)</label>
+              <textarea
+                id="description"
+                formControlName="description"
+                class="form-control"
+                rows="2"
+              ></textarea>
+            </div>
+
+            <div class="d-grid">
+              <button type="submit" class="btn btn-primary" [disabled]="sendMoneyForm.invalid || isSubmitting">
+                <span *ngIf="isSubmitting" class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                Send Money
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
