@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
+@CrossOrigin
 public class UserController {
     
     private final UserService userService;
